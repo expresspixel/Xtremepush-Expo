@@ -1,0 +1,51 @@
+{
+    "expo": {
+        "name": "expoplugin",
+        "slug": "expoplugin",
+        "version": "0.0.1",
+        "orientation": "portrait",
+        "icon": "./assets/images/icon.png",
+        "scheme": "expoplugin",
+        "userInterfaceStyle": "automatic",
+        "newArchEnabled": true,
+        "ios": {
+            "supportsTablet": true,
+            "bundleIdentifier": "com.xtremepush.expoplugin"
+        },
+        "android": {
+            "adaptiveIcon": {
+                "foregroundImage": "./assets/images/adaptive-icon.png",
+                "backgroundColor": "#ffffff"
+            },
+            "edgeToEdgeEnabled": true,
+            "package": "com.xtremepush.expoplugin"
+        },
+        "web": {
+            "bundler": "metro",
+            "output": "static",
+            "favicon": "./assets/images/favicon.png"
+        },
+        "plugins": [
+            "expo-router",
+            [
+                "expo-splash-screen",
+                {
+                    "image": "./assets/images/splash-icon.png",
+                    "imageWidth": 200,
+                    "resizeMode": "contain",
+                    "backgroundColor": "#ffffff"
+                }
+            ],
+            [
+                "./plugins/expo-plugin.js",
+                {
+                    "applicationKey": "YOUR_APPLICATION_KEY",
+                    "googleSenderId": "YOUR_GOOGLE_SENDER_ID"
+                }
+            ]
+        ],
+        "experiments": {
+            "typedRoutes": true
+        }
+    }
+}

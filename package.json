@@ -1,0 +1,23 @@
+{
+    "name": "xtremepush-expo-plugin",
+    "version": "1.0.0",
+    "description": "XtremePush Expo Config Plugin",
+    "main": "plugins/expo-plugin.js",
+    "scripts": {
+        "test": "./test-plugin-e2e.sh"
+    },
+    "keywords": [
+        "expo",
+        "config-plugin",
+        "xtremepush",
+        "push-notifications"
+    ],
+    "author": "XtremePush",
+    "license": "MIT",
+    "dependencies": {
+        "@expo/config-plugins": "^7.0.0"
+    },
+    "devDependencies": {
+        "expo": "^50.0.0"
+    }
+}

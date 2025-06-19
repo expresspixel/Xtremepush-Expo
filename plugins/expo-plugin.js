@@ -64,6 +64,20 @@ const withXPExpoPlugin = (config, pluginConfig) => {
     console.log(`🔔 Push Permissions: ${enablePushPermissions ? 'enabled' : 'disabled'}`);
 
     // ========================================
+    // COPY SUPPORTING FILES
+    // ========================================
+
+    // Copy xtremepush.js to app root
+    config = withDangerousMod(config, [
+        'root',
+        async (config) => {
+            console.log('📄 Copying xtremepush.js to app root...');
+            await copyXtremepushJS(config.modRequest.projectRoot);
+            return config;
+        },
+    ]);
+
+    // ========================================
     // ANDROID CONFIGURATION
     // ========================================
 
@@ -150,6 +164,16 @@ const withXPExpoPlugin = (config, pluginConfig) => {
         return config;
     });
 
+    // Add supporting Android files
+    config = withDangerousMod(config, [
+        'android',
+        async (config) => {
+            console.log('📁 Adding Android supporting files...');
+            await addAndroidSupportingFiles(config.modRequest.projectRoot, config.android?.package);
+            return config;
+        },
+    ]);
+
     // Add imports to activities
     config = withDangerousMod(config, [
         'android',
@@ -180,6 +204,13 @@ const withXPExpoPlugin = (config, pluginConfig) => {
             enableDebugLogs,
             enablePushPermissions
         );
+        return config;
+    });
+
+    // Add supporting iOS files to Xcode project
+    config = withXcodeProject(config, (config) => {
+        console.log('📁 Adding iOS supporting files to Xcode project...');
+        addIOSSupportingFiles(config.modResults);
         return config;
     });
 
@@ -216,6 +247,136 @@ const withXPExpoPlugin = (config, pluginConfig) => {
     console.log('✅ XtremePush Expo Plugin configuration complete!');
     return config;
 };
+
+// ========================================
+// FILE COPYING FUNCTIONS
+// ========================================
+
+async function copyXtremepushJS(projectRoot) {
+    const sourcePath = path.join(__dirname, 'xtremepush.js');
+    const destPath = path.join(projectRoot, 'xtremepush.js');
+
+    try {
+        if (fs.existsSync(destPath)) {
+            console.log('✓ xtremepush.js already exists in app root');
+            return;
+        }
+
+        fs.copyFileSync(sourcePath, destPath);
+        console.log('✅ Copied xtremepush.js to app root');
+    } catch (error) {
+        console.error('❌ Error copying xtremepush.js:', error);
+    }
+}
+
+async function addAndroidSupportingFiles(projectRoot, packageName) {
+    const androidSrcPath = path.join(projectRoot, 'android', 'app', 'src', 'main', 'java');
+
+    if (!fs.existsSync(androidSrcPath)) {
+        console.warn('⚠️  Android source directory not found');
+        return;
+    }
+
+    // Find the correct package directory
+    let packageDir = null;
+    if (packageName) {
+        const packagePath = path.join(androidSrcPath, ...packageName.split('.'));
+        if (fs.existsSync(packagePath)) {
+            packageDir = packagePath;
+        }
+    }
+
+    // If package directory not found, look for existing directories
+    if (!packageDir) {
+        const files = fs.readdirSync(androidSrcPath);
+        for (const file of files) {
+            const filePath = path.join(androidSrcPath, file);
+            if (fs.statSync(filePath).isDirectory()) {
+                packageDir = filePath;
+                break;
+            }
+        }
+    }
+
+    if (!packageDir) {
+        console.warn('⚠️  Could not find Android package directory');
+        return;
+    }
+
+    console.log(`📁 Using Android package directory: ${packageDir}`);
+
+    // Copy RNXtremepushReactModule.java
+    const moduleSource = path.join(__dirname, 'supporting-files', 'android', 'RNXtremepushReactModule.java');
+    const moduleDest = path.join(packageDir, 'RNXtremepushReactModule.java');
+
+    try {
+        let moduleContent = fs.readFileSync(moduleSource, 'utf8');
+
+        // Update package name
+        const currentPackage = moduleContent.match(/package\s+([^;]+);/)?.[1];
+        if (currentPackage && packageName) {
+            moduleContent = moduleContent.replace(
+                /package\s+[^;]+;/,
+                `package ${packageName};`
+            );
+            console.log(`✅ Updated package name from ${currentPackage} to ${packageName}`);
+        }
+
+        fs.writeFileSync(moduleDest, moduleContent, 'utf8');
+        console.log('✅ Added RNXtremepushReactModule.java');
+    } catch (error) {
+        console.error('❌ Error adding RNXtremepushReactModule.java:', error);
+    }
+
+    // Copy RNXtremepushReactPackage.java
+    const packageSource = path.join(__dirname, 'supporting-files', 'android', 'RNXtremepushReactPackage.java');
+    const packageDest = path.join(packageDir, 'RNXtremepushReactPackage.java');
+
+    try {
+        let packageContent = fs.readFileSync(packageSource, 'utf8');
+
+        // Update package name
+        const currentPackage = packageContent.match(/package\s+([^;]+)/)?.[1];
+        if (currentPackage && packageName) {
+            packageContent = packageContent.replace(
+                /package\s+[^;]+/,
+                `package ${packageName}`
+            );
+            console.log(`✅ Updated package name from ${currentPackage} to ${packageName}`);
+        }
+
+        fs.writeFileSync(packageDest, packageContent, 'utf8');
+        console.log('✅ Added RNXtremepushReactPackage.java');
+    } catch (error) {
+        console.error('❌ Error adding RNXtremepushReactPackage.java:', error);
+    }
+}
+
+function addIOSSupportingFiles(xcodeProject) {
+    const iosPath = path.join(__dirname, 'supporting-files', 'ios');
+
+    try {
+        // Add RNXtremepushReact.h
+        const headerPath = path.join(iosPath, 'RNXtremepushReact.h');
+        if (fs.existsSync(headerPath)) {
+            xcodeProject.addSourceFile(headerPath, {
+                target: xcodeProject.getFirstTarget().uuid
+            });
+            console.log('✅ Added RNXtremepushReact.h to Xcode project');
+        }
+
+        // Add RNXtremepushReact.m
+        const implementationPath = path.join(iosPath, 'RNXtremepushReact.m');
+        if (fs.existsSync(implementationPath)) {
+            xcodeProject.addSourceFile(implementationPath, {
+                target: xcodeProject.getFirstTarget().uuid
+            });
+            console.log('✅ Added RNXtremepushReact.m to Xcode project');
+        }
+    } catch (error) {
+        console.error('❌ Error adding iOS supporting files:', error);
+    }
+}
 
 // ========================================
 // ANDROID HELPER FUNCTIONS
@@ -414,39 +575,87 @@ function createMainApplicationFile(config, applicationKey, googleSenderId, enabl
 import android.app.Application;
 import android.util.Log;
 import ie.imobile.extremepush.PushConnector;
+import com.facebook.react.ReactApplication;
+import com.facebook.react.ReactNativeHost;
+import com.facebook.react.ReactPackage;
+import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint;
+import com.facebook.react.defaults.DefaultReactNativeHost;
+import com.facebook.soloader.SoLoader;
+import java.util.List;
 
-public class MainApplication extends Application {
-    
-    private static final String TAG = "MainApplication";
-    
-    @Override
-    public void onCreate() {
-        super.onCreate();
-        Log.d(TAG, "MainApplication onCreate() called!");
-        
-        initializeXtremePush();
-    }
-    
-    private void initializeXtremePush() {
-        Log.d(TAG, "Initializing XtremePush with appKey: ${applicationKey}");
-        
-        try {
-            PushConnector.Builder builder = new PushConnector.Builder("${applicationKey}", "${googleSenderId}")
-                .turnOnDebugLogs(${enableDebugLogs});
-                
-            builder.create(this);
-            
-            Log.d(TAG, "XtremePush initialized successfully!");
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to initialize XtremePush: " + e.getMessage(), e);
+public class MainApplication extends Application implements ReactApplication {
+
+  private final ReactNativeHost mReactNativeHost =
+      new DefaultReactNativeHost(this) {
+        @Override
+        public boolean getUseDeveloperSupport() {
+          return BuildConfig.DEBUG;
         }
+
+        @Override
+        protected List<ReactPackage> getPackages() {
+          @SuppressWarnings("UnnecessaryLocalVariable")
+          List<ReactPackage> packages = new PackageList(this).getPackages();
+          // Add XtremePush ReactPackage
+          packages.add(new RNXtremepushReactPackage());
+          return packages;
+        }
+
+        @Override
+        protected String getJSMainModuleName() {
+          return "index";
+        }
+
+        @Override
+        protected boolean isNewArchEnabled() {
+          return BuildConfig.IS_NEW_ARCHITECTURE_ENABLED;
+        }
+
+        @Override
+        protected Boolean isHermesEnabled() {
+          return BuildConfig.IS_HERMES_ENABLED;
+        }
+      };
+
+  @Override
+  public ReactNativeHost getReactNativeHost() {
+    return mReactNativeHost;
+  }
+
+  @Override
+  public void onCreate() {
+    super.onCreate();
+    SoLoader.init(this, /* native exopackage */ false);
+    if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
+      // If you opted-in for the New Architecture, we load the native entry point for this app.
+      DefaultNewArchitectureEntryPoint.load();
     }
+    ReactNativeFlipper.initializeFlipper(this, getReactNativeHost().getReactInstanceManager());
+    
+    initializeXtremePush();
+  }
+  
+  private void initializeXtremePush() {
+    Log.d("MainApplication", "Initializing XtremePush with appKey: ${applicationKey}");
+    
+    try {
+        PushConnector.Builder builder = new PushConnector.Builder("${applicationKey}", "${googleSenderId}")
+            .turnOnDebugLogs(${enableDebugLogs});
+            
+        builder.create(this);
+        
+        Log.d("MainApplication", "XtremePush initialized successfully!");
+    } catch (Exception e) {
+        Log.e("MainApplication", "Failed to initialize XtremePush: " + e.getMessage(), e);
+    }
+  }
 }
 `;
 }
 
 function addPushConnectorToMainApplication(mainApplicationContents, applicationKey, googleSenderId, enableDebugLogs, enablePushPermissions) {
     const importStatement = 'import ie.imobile.extremepush.PushConnector';
+    const reactPackageImport = 'import RNXtremepushReactPackage';
 
     const isKotlin = mainApplicationContents.includes('class MainApplication : Application()') ||
         mainApplicationContents.includes('override fun onCreate()') ||
@@ -454,23 +663,16 @@ function addPushConnectorToMainApplication(mainApplicationContents, applicationK
 
     let initializationCode;
     if (isKotlin) {
-        initializationCode = `        // Initialize XtremePush
-        PushConnector.Builder("${applicationKey}", "${googleSenderId}")
-            .turnOnDebugLogs(${enableDebugLogs})
-            .create(this)`;
+        initializationCode = `        // Initialize XtremePush\n        PushConnector.Builder(\"${applicationKey}\", \"${googleSenderId}\")\n            .turnOnDebugLogs(${enableDebugLogs})\n            .create(this)`;
     } else {
-        initializationCode = `        // Initialize XtremePush
-        new PushConnector.Builder("${applicationKey}", "${googleSenderId}")
-            .turnOnDebugLogs(${enableDebugLogs})
-            .create(this);`;
+        initializationCode = `        // Initialize XtremePush\n        new PushConnector.Builder(\"${applicationKey}\", \"${googleSenderId}\")\n            .turnOnDebugLogs(${enableDebugLogs})\n            .create(this);`;
     }
 
     let modifiedContents = mainApplicationContents;
 
-    // Add import if not present
+    // Add imports if not present
     if (!modifiedContents.includes(importStatement)) {
         const importRegex = /(import\s+[^;\r\n]+[\r\n]+)+/;
-
         if (importRegex.test(modifiedContents)) {
             modifiedContents = modifiedContents.replace(
                 importRegex,
@@ -480,11 +682,43 @@ function addPushConnectorToMainApplication(mainApplicationContents, applicationK
         }
     }
 
+    // Add ReactPackage import if not present
+    if (!modifiedContents.includes('RNXtremepushReactPackage')) {
+        const importRegex = /(import\s+[^;\r\n]+[\r\n]+)+/;
+        if (importRegex.test(modifiedContents)) {
+            modifiedContents = modifiedContents.replace(
+                importRegex,
+                `$&${reactPackageImport}\n`
+            );
+            console.log('✅ Added RNXtremepushReactPackage import');
+        }
+    }
+
+    // Robustly add RNXtremepushReactPackage to getPackages()
+    if (modifiedContents.includes('getPackages()') && !/packages\.add\(new RNXtremepushReactPackage\(\)\)/.test(modifiedContents)) {
+        // Find the getPackages() method
+        const getPackagesRegex = /(protected List<ReactPackage> getPackages\(\)\s*\{[\s\S]*?List<ReactPackage> packages = new PackageList\(this\)\.getPackages\(\);[\s\S]*?)(return packages;)/;
+        if (getPackagesRegex.test(modifiedContents)) {
+            modifiedContents = modifiedContents.replace(
+                getPackagesRegex,
+                (match, beforeReturn, returnLine) => {
+                    // Insert after the packages list is created, before return
+                    return (
+                        beforeReturn +
+                        '      // XtremePush: Add the RNXtremepushReactPackage\n' +
+                        '      packages.add(new RNXtremepushReactPackage());\n' +
+                        returnLine
+                    );
+                }
+            );
+            console.log('✅ Robustly added RNXtremepushReactPackage to getPackages method');
+        }
+    }
+
     // Add initialization if not present
     if (!modifiedContents.includes('PushConnector.Builder')) {
         if (isKotlin) {
             const onCreateRegex = /(override fun onCreate\(\)\s*{[^}]*super\.onCreate\(\))/;
-
             if (onCreateRegex.test(modifiedContents)) {
                 modifiedContents = modifiedContents.replace(
                     onCreateRegex,
@@ -495,7 +729,6 @@ function addPushConnectorToMainApplication(mainApplicationContents, applicationK
         } else {
             const onCreateRegex = /(public void onCreate\(\)\s*{[^}]*super\.onCreate\(\);)/;
             const overrideRegex = /(@Override\s*public void onCreate\(\)\s*{[^}]*super\.onCreate\(\);)/;
-
             if (onCreateRegex.test(modifiedContents)) {
                 modifiedContents = modifiedContents.replace(
                     onCreateRegex,

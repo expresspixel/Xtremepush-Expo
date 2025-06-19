@@ -1,17 +1,28 @@
 # XtremePush Expo Plugin
 
-A config plugin for Expo applications that integrates XtremePush functionality into an Expo application. 
-iOS and Android now available.
+A comprehensive config plugin for Expo applications that integrates XtremePush functionality with full React Native module support for both iOS and Android platforms.
 
 ## Features
 
-- Automatically configures Android permissions for location services
-- Integrates XtremePush SDK and required dependencies
-- Sets up Google Firebase Messaging
-- Configures MainApplication for push notifications
-- Adds necessary imports to all Android activities
-- Supports both iOS and Android platforms
-- Configurable debug logging and permissions
+### 🚀 Core Integration
+- **Automatic React Native Module Setup**: Creates and configures native modules for seamless JavaScript-to-native communication
+- **Smart File Management**: Automatically copies and configures all necessary files to the correct locations
+- **Package Name Detection**: Automatically detects and updates package names in Android files to match your Expo project
+
+### 📱 Platform Support
+- **Android**: Full integration with automatic permission setup, dependency management, and MainApplication configuration
+- **iOS**: Complete Xcode project integration with AppDelegate configuration and background modes setup
+
+### 🔧 Configuration & Customization
+- **Flexible Key Management**: Support for platform-specific or unified application keys
+- **Configurable Permissions**: Granular control over location services and push notification permissions
+- **Debug Support**: Built-in debug logging for development and troubleshooting
+
+### 📦 Automatic File Integration
+- **JavaScript Module**: Automatically copies `xtremepush.js` to your app root for easy importing
+- **Android Native Files**: Adds `RNXtremepushReactModule.java` and `RNXtremepushReactPackage.java` to your Android package
+- **iOS Native Files**: Integrates `RNXtremepushReact.h` and `RNXtremepushReact.m` into your Xcode project
+- **ReactPackage Registration**: Automatically adds the ReactPackage to your MainApplication's `getPackages()` method
 
 ## Installation
 
@@ -19,7 +30,7 @@ iOS and Android now available.
 npm install @xtremepush/expo-plugin
 ```
 
-This will be ultimately completed as part of publishing to NPM. 
+*Note: This will be available on NPM once published.*
 
 ## Usage
 
@@ -34,82 +45,163 @@ Add the plugin to your `app.json` or `app.config.js`:
         "iosAppKey": "YOUR_IOS_APP_KEY",
         "androidAppKey": "YOUR_ANDROID_APP_KEY",
         "googleSenderId": "GOOGLE_SENDER_ID",
-        "enableDebugLogs": true, // default true
-        "enableLocationServices": true, // default true
-        "enablePushPermissions": true // default true
+        "enableDebugLogs": true,
+        "enableLocationServices": true,
+        "enablePushPermissions": true
       }]
     ]
   }
 }
 ```
 
-### Configuration Options
+### JavaScript Usage
 
-#### Required Parameters
-- `googleSenderId` (string): Your Google Cloud Messaging Sender ID
+After running the plugin, you can import and use XtremePush in your React Native code:
 
-#### Application Keys (at least one required)
+```javascript
+import Xtremepush, { 
+  hitEvent, 
+  hitTag, 
+  hitTagWithValue, 
+  openInbox, 
+  setUser, 
+  setExternalId, 
+  requestNotificationPermissions 
+} from './xtremepush';
+
+// Or use the default export
+Xtremepush.hitEvent('user_action');
+Xtremepush.hitTag('premium_user');
+
+// Or use named exports
+hitEvent('user_action');
+hitTag('premium_user');
+hitTagWithValue('user_level', 'gold');
+setUser('user123');
+setExternalId('ext123');
+openInbox();
+requestNotificationPermissions();
+```
+
+## Configuration Options
+
+### Required Parameters
+- `googleSenderId` (string): Your Google Cloud Messaging Sender ID for Firebase push notifications
+
+### Application Keys (at least one required)
 - `applicationKey` (string): XtremePush Application Key (used for both platforms if platform-specific keys not provided)
 - `iosAppKey` (string): iOS-specific XtremePush Application Key (overrides applicationKey for iOS)
 - `androidAppKey` (string): Android-specific XtremePush Application Key (overrides applicationKey for Android)
 
-#### Optional Parameters
+### Optional Parameters
 - `enableDebugLogs` (boolean): Enable debug logging for development. **Default: `true`**
 - `enableLocationServices` (boolean): Enable location services and permissions. **Default: `true`**
 - `enablePushPermissions` (boolean): Automatically request push notification permissions. **Default: `true`**
 
-### Configuration Flags Explained
-
-The following configuration flags are now available and can be added to your `app.json` file:
-
-- **`applicationKey`**: A general application key that will be used for both iOS and Android platforms. If you provide platform-specific keys (`iosAppKey` or `androidAppKey`), they will override this general key for their respective platforms.
-
-- **`iosAppKey`**: iOS-specific XtremePush application key. If provided, this will override the `applicationKey` for iOS platform.
-
-- **`androidAppKey`**: Android-specific XtremePush application key. If provided, this will override the `applicationKey` for Android platform.
-
-- **`googleSenderId`**: Your Google Cloud Messaging Sender ID required for Firebase push notifications.
-
-- **`enableDebugLogs`**: When set to `true`, enables detailed logging for debugging purposes. This is useful during development to track XtremePush SDK behavior and troubleshoot issues. Debug logs are automatically enabled in debug builds.
-
-- **`enableLocationServices`**: When set to `true`, enables location services and adds necessary location permissions including `ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION`, and `ACCESS_BACKGROUND_LOCATION`.
-
-- **`enablePushPermissions`**: When set to `true`, the plugin will automatically request push notification permissions from users and add the `POST_NOTIFICATIONS` permission for Android.
-
 ## What This Plugin Does
 
-1. **Android Configuration**:
-   - Adds necessary permissions (Internet, Network State, Wake Lock, Vibrate, Boot Completed)
-   - Configures XtremePush Maven repository
-   - Adds Google Services plugin
-   - Integrates required dependencies (XtremePush SDK, Firebase Messaging, OkHttp, etc.)
-   - Creates or modifies MainApplication.java/kt with PushConnector initialization
-   - Adds imports to all Android activities
+### 🔄 Automatic File Operations
+1. **Copies `xtremepush.js`** to your Expo app root directory
+2. **Adds Android native files** to your Android package directory with automatic package name updates
+3. **Integrates iOS native files** into your Xcode project
+4. **Registers ReactPackage** in your MainApplication's `getPackages()` method
 
-2. **iOS Configuration**:
-   - Adds XtremePush iOS SDK to Podfile
-   - Configures AppDelegate (Swift/Objective-C) with XPush initialization
-   - Adds required background modes (remote-notification, fetch) to Info.plist
+### 🤖 Android Configuration
+- **Permissions**: Internet, Network State, Wake Lock, Vibrate, Boot Completed, Post Notifications, Location (if enabled)
+- **Dependencies**: XtremePush SDK, Firebase Messaging, OkHttp, Otto, Gson, AndroidX Security, Work Runtime
+- **Build Configuration**: Maven repository, Google Services plugin
+- **MainApplication**: PushConnector initialization and ReactPackage registration
+- **Activity Integration**: Automatic import statements for all activities
+
+### 🍎 iOS Configuration
+- **Podfile**: XtremePush iOS SDK integration
+- **AppDelegate**: XPush initialization (Swift/Objective-C support)
+- **Info.plist**: Background modes (remote-notification, fetch), location usage descriptions
+- **Xcode Project**: Native module files integration
+
+### 📱 React Native Module Features
+The plugin creates a complete React Native bridge with these methods:
+- `hitEvent(event)` - Track custom events
+- `hitTag(tag)` - Set user tags
+- `hitTagWithValue(tag, value)` - Set user tags with values
+- `setUser(user)` - Set user identifier
+- `setExternalId(id)` - Set external user ID
+- `openInbox()` - Open push notification inbox
+- `requestNotificationPermissions()` - Request notification permissions
 
 ## Dependencies Added
 
 ### Android Dependencies
-- XtremePush SDK (9.3.11)
-- Firebase Messaging (24.0.3)
-- OkHttp (4.12.0)
-- Otto (1.3.8)
-- Gson (2.11.0)
-- AndroidX Security Crypto (1.0.0)
-- AndroidX Work Runtime (2.9.1)
+- `ie.imobile.extremepush:XtremePush_lib:9.3.11` - XtremePush SDK
+- `com.google.firebase:firebase-messaging:24.0.3` - Firebase Messaging
+- `com.squareup.okhttp3:okhttp:4.12.0` - HTTP client
+- `com.squareup:otto:1.3.8` - Event bus
+- `com.google.code.gson:gson:2.11.0` - JSON parsing
+- `androidx.security:security-crypto:1.0.0` - Security utilities
+- `androidx.work:work-runtime:2.9.1` - Background work
 
 ### iOS Dependencies
-- XPush SDK (from GitHub repository)
+- `XPush` - XtremePush iOS SDK (from GitHub repository)
+
+## File Structure After Plugin Execution
+
+```
+your-expo-app/
+├── xtremepush.js                    # JavaScript module (auto-copied)
+├── android/
+│   └── app/
+│       └── src/
+│           └── main/
+│               └── java/
+│                   └── com/
+│                       └── your/
+│                           └── package/
+│                               ├── RNXtremepushReactModule.java    # Auto-added
+│                               └── RNXtremepushReactPackage.java   # Auto-added
+└── ios/
+    └── YourApp/
+        ├── RNXtremepushReact.h      # Auto-integrated
+        └── RNXtremepushReact.m      # Auto-integrated
+```
 
 ## Requirements
 
-- Expo SDK 49 or higher
-- Android target SDK 33 or higher
-- iOS deployment target 12.0 or higher
+- **Expo SDK**: 49 or higher
+- **Android**: Target SDK 33 or higher
+- **iOS**: Deployment target 12.0 or higher
+- **React Native**: Compatible with latest versions
+
+## Testing
+
+Run the included test script to verify plugin functionality:
+
+```bash
+./test-plugin-e2e.sh
+```
+
+This will check:
+- ✅ All supporting files exist
+- ✅ Plugin syntax is valid
+- ✅ Plugin exports correctly
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Package name mismatch**: The plugin automatically detects and updates package names in Android files
+2. **Missing permissions**: All required permissions are automatically added based on your configuration
+3. **Build errors**: Ensure you have the latest Expo SDK and compatible React Native version
+
+### Debug Mode
+
+Enable debug logs to troubleshoot integration issues:
+
+```json
+{
+  "enableDebugLogs": true
+}
+```
 
 ## License
-Xtremepush Limited 
+
+© Xtremepush Limited. All rights reserved.

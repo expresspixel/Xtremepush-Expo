@@ -1,22 +1,99 @@
-const { withAndroidManifest, withProjectBuildGradle, withAppBuildGradle, withMainApplication, withDangerousMod } = require('@expo/config-plugins');
+const {
+    // Android imports
+    withAndroidManifest,
+    withProjectBuildGradle,
+    withAppBuildGradle,
+    withMainApplication,
+    withDangerousMod,
+    // iOS imports
+    withPodfile,
+    withAppDelegate,
+    withXcodeProject,
+    withInfoPlist
+} = require('@expo/config-plugins');
+
 const fs = require('fs');
 const path = require('path');
 
+/**
+ * XtremePush Expo Config Plugin
+ * 
+ * @param {object} config - Expo config
+ * @param {object} pluginConfig - Plugin configuration options
+ * @param {string} pluginConfig.applicationKey - XtremePush Application Key (used for both platforms if platform-specific keys not provided)
+ * @param {string} pluginConfig.iosAppKey - iOS-specific XtremePush Application Key (overrides applicationKey for iOS)
+ * @param {string} pluginConfig.androidAppKey - Android-specific XtremePush Application Key (overrides applicationKey for Android)
+ * @param {string} pluginConfig.googleSenderId - Google Cloud Messaging Sender ID
+ * @param {boolean} pluginConfig.enableDebugLogs - Enable debug logging (default: true in debug builds)
+ * @param {boolean} pluginConfig.enableLocationServices - Enable location permissions (default: true)
+ * @param {boolean} pluginConfig.enablePushPermissions - Enable push notification permissions (default: true)
+ * @returns {object} Modified Expo config
+ */
 const withXPExpoPlugin = (config, pluginConfig) => {
-    console.log('🔧 Xtremepush Expo Plugin running...');
+    console.log('🔧 Xtremepush Expo Plugin running for both platforms...');
 
+    // Validate and set default options
     const options = pluginConfig || {};
-    const { applicationKey = 'DEFAULT_APP_KEY', googleSenderId = 'DEFAULT_SENDER_ID' } = options;
+    const {
+        applicationKey = 'DEFAULT_APP_KEY',
+        iosAppKey,
+        androidAppKey,
+        googleSenderId = 'DEFAULT_SENDER_ID',
+        enableDebugLogs = true,
+        enableLocationServices = true,
+        enablePushPermissions = true
+    } = options;
 
+    // Determine platform-specific keys
+    const iosApplicationKey = iosAppKey || applicationKey;
+    const androidApplicationKey = androidAppKey || applicationKey;
+
+    // Validate required parameters
+    if (iosApplicationKey === 'DEFAULT_APP_KEY') {
+        console.warn('⚠️  WARNING: Using default iOS application key. Please provide your XtremePush iOS application key.');
+    }
+    if (androidApplicationKey === 'DEFAULT_APP_KEY') {
+        console.warn('⚠️  WARNING: Using default Android application key. Please provide your XtremePush Android application key.');
+    }
+    if (googleSenderId === 'DEFAULT_SENDER_ID') {
+        console.warn('⚠️  WARNING: Using default Google Sender ID. Please provide your Google Cloud Messaging Sender ID.');
+    }
+
+    console.log(`📱 iOS App Key: ${iosApplicationKey}`);
+    console.log(`🤖 Android App Key: ${androidApplicationKey}`);
+    console.log(`🔔 Push Permissions: ${enablePushPermissions ? 'enabled' : 'disabled'}`);
+
+    // ========================================
+    // ANDROID CONFIGURATION
+    // ========================================
+
+    // Android Manifest - Permissions and Application Configuration
     config = withAndroidManifest(config, (config) => {
-        console.log('Adding Android Permissions...');
+        console.log('📱 Configuring Android Manifest...');
 
         const permissions = [
-            'android.permission.ACCESS_COARSE_LOCATION',
-            'android.permission.ACCESS_FINE_LOCATION',
-            'android.permission.ACCESS_BACKGROUND_LOCATION'
+            'android.permission.INTERNET',
+            'android.permission.ACCESS_NETWORK_STATE',
+            'android.permission.WAKE_LOCK',
+            'android.permission.VIBRATE',
+            'android.permission.RECEIVE_BOOT_COMPLETED'
         ];
 
+        // Add push notification permissions if enabled
+        if (enablePushPermissions) {
+            permissions.push('android.permission.POST_NOTIFICATIONS');
+        }
+
+        // Add location permissions if enabled
+        if (enableLocationServices) {
+            permissions.push(
+                'android.permission.ACCESS_COARSE_LOCATION',
+                'android.permission.ACCESS_FINE_LOCATION',
+                'android.permission.ACCESS_BACKGROUND_LOCATION'
+            );
+        }
+
+        // Add permissions
         permissions.forEach(permission => {
             if (!config.modResults.manifest['uses-permission']?.find(p => p.$['android:name'] === permission)) {
                 config.modResults.manifest['uses-permission'] = config.modResults.manifest['uses-permission'] || [];
@@ -26,91 +103,143 @@ const withXPExpoPlugin = (config, pluginConfig) => {
             }
         });
 
-        // Make sure the application element points to our MainApplication class
+        // Configure application element
         if (config.modResults.manifest.application && config.modResults.manifest.application[0]) {
             const packageName = config.android?.package || 'com.anonymous.testapp';
-            config.modResults.manifest.application[0].$['android:name'] = `${packageName}.MainApplication`;
-            console.log('Set android:name to MainApplication');
+            config.modResults.manifest.application[0].$['android:name'] = `.MainApplication`;
+            console.log('✅ Set android:name to MainApplication');
         }
 
         return config;
     });
 
-    // Here we will add the Maven Repository
+    // Project-level build.gradle
     config = withProjectBuildGradle(config, (config) => {
-        console.log('Adding Maven Repository...');
+        console.log('📦 Configuring project-level build.gradle...');
         config.modResults.contents = addMavenRepository(config.modResults.contents);
-
-        console.log('Adding Google Services plugin to project-level build.gradle...');
         config.modResults.contents = addGoogleServicesPluginToProject(config.modResults.contents);
-
         return config;
     });
 
-    // Add dependencies 
+    // App-level build.gradle
     config = withAppBuildGradle(config, (config) => {
-        console.log('Adding dependencies...');
+        console.log('📚 Configuring app-level build.gradle...');
         config.modResults.contents = addDependencies(config.modResults.contents);
-
-        console.log('Adding Google Services plugin to app-level build.gradle...');
         config.modResults.contents = addGoogleServicesPluginToApp(config.modResults.contents);
-
         return config;
     });
 
-    // Create or modify MainApplication.java 
+    // MainApplication.java/kt
     config = withMainApplication(config, (config) => {
-        console.log('Creating/Modifying MainApplication.java...');
+        console.log('🔨 Configuring MainApplication...');
 
-        // Check if MainApplication exists, if not create it
         if (!config.modResults.contents || config.modResults.contents.trim() === '') {
-            console.log('Creating new MainApplication.java file...');
-            config.modResults.contents = createMainApplicationFile(config, applicationKey, googleSenderId);
+            console.log('Creating new MainApplication file...');
+            config.modResults.contents = createMainApplicationFile(config, androidApplicationKey, googleSenderId, enableDebugLogs, enablePushPermissions);
         } else {
-            console.log('Modifying existing MainApplication.java...');
+            console.log('Modifying existing MainApplication...');
             config.modResults.contents = addPushConnectorToMainApplication(
                 config.modResults.contents,
-                applicationKey,
-                googleSenderId
+                androidApplicationKey,
+                googleSenderId,
+                enableDebugLogs,
+                enablePushPermissions
             );
         }
 
         return config;
     });
 
-    // Add imports to all activities - MUST BE LAST AND AT TOP LEVEL
+    // Add imports to activities
     config = withDangerousMod(config, [
         'android',
         async (config) => {
-            console.log('Adding imports to all activities...');
+            console.log('🎯 Adding imports to Android activities...');
             await addImportsToAllActivities(config.modRequest.projectRoot);
             return config;
         },
     ]);
 
+    // ========================================
+    // iOS CONFIGURATION
+    // ========================================
+
+    // iOS Podfile
+    config = withPodfile(config, (config) => {
+        console.log('📦 Configuring iOS Podfile...');
+        config.modResults.contents = addIOSDependencies(config.modResults.contents);
+        return config;
+    });
+
+    // iOS AppDelegate
+    config = withAppDelegate(config, (config) => {
+        console.log('🔨 Configuring iOS AppDelegate...');
+        config.modResults.contents = addIOSInitialization(
+            config.modResults.contents,
+            iosApplicationKey,
+            enableDebugLogs,
+            enablePushPermissions
+        );
+        return config;
+    });
+
+    // iOS Info.plist - Add required background modes
+    config = withInfoPlist(config, (config) => {
+        console.log('📝 Configuring iOS Info.plist...');
+
+        // Add background modes
+        if (!config.modResults.UIBackgroundModes) {
+            config.modResults.UIBackgroundModes = [];
+        }
+
+        const requiredModes = ['remote-notification', 'fetch'];
+        requiredModes.forEach(mode => {
+            if (!config.modResults.UIBackgroundModes.includes(mode)) {
+                config.modResults.UIBackgroundModes.push(mode);
+            }
+        });
+
+        // Add location usage descriptions if enabled
+        if (enableLocationServices) {
+            config.modResults.NSLocationWhenInUseUsageDescription =
+                config.modResults.NSLocationWhenInUseUsageDescription ||
+                'This app needs access to location when open to provide location-based notifications.';
+
+            config.modResults.NSLocationAlwaysAndWhenInUseUsageDescription =
+                config.modResults.NSLocationAlwaysAndWhenInUseUsageDescription ||
+                'This app needs access to location to provide location-based notifications.';
+        }
+
+        return config;
+    });
+
+    console.log('✅ XtremePush Expo Plugin configuration complete!');
     return config;
 };
+
+// ========================================
+// ANDROID HELPER FUNCTIONS
+// ========================================
 
 function addMavenRepository(buildGradleContents) {
     const mavenUrl = 'https://maven.xtremepush.com/artifactory/libs-release-local/';
     const mavenRepo = `        maven { url '${mavenUrl}' }`;
 
-    // Check if already added
     if (buildGradleContents.includes(mavenUrl)) {
-        console.log('Maven Repository already exists.');
+        console.log('✅ Maven Repository already exists.');
         return buildGradleContents;
     }
 
-    // Find the allprojects repositories block and add our Maven Repo
     const allProjectsRegex = /(allprojects\s*{\s*repositories\s*{[^}]*)(})/;
 
     if (allProjectsRegex.test(buildGradleContents)) {
+        console.log('✅ Added XtremePush Maven Repository');
         return buildGradleContents.replace(
             allProjectsRegex,
             `$1${mavenRepo}\n    $2`
         );
     } else {
-        console.warn('Could not find allprojects repositories block');
+        console.warn('⚠️  Could not find allprojects repositories block');
         return buildGradleContents;
     }
 }
@@ -131,19 +260,16 @@ function addDependencies(buildGradleContents) {
     dependencies.forEach(dependency => {
         const implementationLine = `    implementation '${dependency}'`;
 
-        // Check if dependency already exists
         if (modifiedContents.includes(dependency)) {
-            console.log(`Dependency ${dependency} already exists`);
+            console.log(`✓ Dependency ${dependency} already exists`);
             return;
         }
 
-        // More robust regex to find the dependencies block
         const dependenciesMatch = modifiedContents.match(/dependencies\s*\{/);
 
         if (dependenciesMatch) {
             const startIndex = dependenciesMatch.index + dependenciesMatch[0].length;
 
-            // Find the matching closing brace for the dependencies block
             let braceCount = 1;
             let endIndex = startIndex;
 
@@ -153,14 +279,11 @@ function addDependencies(buildGradleContents) {
                 endIndex++;
             }
 
-            // Insert our dependency just before the closing brace
             const beforeClosing = modifiedContents.substring(0, endIndex - 1);
             const afterClosing = modifiedContents.substring(endIndex - 1);
 
             modifiedContents = beforeClosing + `\n${implementationLine}` + afterClosing;
-            console.log(`Added dependency: ${dependency}`);
-        } else {
-            console.warn('Could not find dependencies block');
+            console.log(`✅ Added dependency: ${dependency}`);
         }
     });
 
@@ -168,21 +291,18 @@ function addDependencies(buildGradleContents) {
 }
 
 function addGoogleServicesPluginToProject(buildGradleContents) {
-    const googleServicesPlugin = `    classpath 'com.google.gms:google-services:4.4.2'`;
+    const googleServicesPlugin = `        classpath 'com.google.gms:google-services:4.4.2'`;
 
-    // Check if already added
     if (buildGradleContents.includes('com.google.gms:google-services')) {
-        console.log('Google Services plugin already exists in project build.gradle');
+        console.log('✓ Google Services plugin already exists in project build.gradle');
         return buildGradleContents;
     }
 
-    // Find the dependencies block in buildscript and add the Google Services plugin
     const buildscriptDepsMatch = buildGradleContents.match(/buildscript\s*{[\s\S]*?dependencies\s*\{/);
 
     if (buildscriptDepsMatch) {
         const startIndex = buildscriptDepsMatch.index + buildscriptDepsMatch[0].length;
 
-        // Find the matching closing brace for the dependencies block
         let braceCount = 1;
         let endIndex = startIndex;
 
@@ -192,14 +312,13 @@ function addGoogleServicesPluginToProject(buildGradleContents) {
             endIndex++;
         }
 
-        // Insert our plugin just before the closing brace
         const beforeClosing = buildGradleContents.substring(0, endIndex - 1);
         const afterClosing = buildGradleContents.substring(endIndex - 1);
 
-        console.log('Added Google Services plugin to project build.gradle');
+        console.log('✅ Added Google Services plugin to project build.gradle');
         return beforeClosing + `\n${googleServicesPlugin}` + afterClosing;
     } else {
-        console.warn('Could not find buildscript dependencies block in project build.gradle');
+        console.warn('⚠️  Could not find buildscript dependencies block');
         return buildGradleContents;
     }
 }
@@ -207,13 +326,11 @@ function addGoogleServicesPluginToProject(buildGradleContents) {
 function addGoogleServicesPluginToApp(buildGradleContents) {
     const googleServicesPlugin = `apply plugin: 'com.google.gms.google-services'`;
 
-    // Check if already added
     if (buildGradleContents.includes('com.google.gms.google-services')) {
-        console.log('Google Services plugin already exists in app build.gradle');
+        console.log('✓ Google Services plugin already exists in app build.gradle');
         return buildGradleContents;
     }
 
-    // Find the existing apply plugin lines and add after them
     const applyPluginRegex = /(apply plugin:.*\n)+/;
 
     if (applyPluginRegex.test(buildGradleContents)) {
@@ -221,10 +338,10 @@ function addGoogleServicesPluginToApp(buildGradleContents) {
             applyPluginRegex,
             `$&${googleServicesPlugin}\n`
         );
-        console.log('Added Google Services plugin to app build.gradle');
+        console.log('✅ Added Google Services plugin to app build.gradle');
         return buildGradleContents;
     } else {
-        console.warn('Could not find apply plugin section in app build.gradle');
+        console.warn('⚠️  Could not find apply plugin section');
         return buildGradleContents;
     }
 }
@@ -233,14 +350,14 @@ async function addImportsToAllActivities(projectRoot) {
     const androidSrcPath = path.join(projectRoot, 'android', 'app', 'src', 'main', 'java');
 
     if (!fs.existsSync(androidSrcPath)) {
-        console.warn('Android source directory not found');
+        console.warn('⚠️  Android source directory not found');
         return;
     }
 
     try {
         await findAndModifyActivities(androidSrcPath);
     } catch (error) {
-        console.error('Error adding imports to activities:', error);
+        console.error('❌ Error adding imports to activities:', error);
     }
 }
 
@@ -252,10 +369,8 @@ async function findAndModifyActivities(dir) {
         const stat = fs.statSync(filePath);
 
         if (stat.isDirectory()) {
-            // Recursively search subdirectories
             await findAndModifyActivities(filePath);
         } else if (file.endsWith('Activity.java')) {
-            // Found an activity file
             console.log(`Processing activity: ${file}`);
             addImportToActivity(filePath);
         }
@@ -268,13 +383,11 @@ function addImportToActivity(activityFilePath) {
     try {
         let content = fs.readFileSync(activityFilePath, 'utf8');
 
-        // Check if import already exists
         if (content.includes(importStatement)) {
-            console.log(`Import already exists in ${path.basename(activityFilePath)}`);
+            console.log(`✓ Import already exists in ${path.basename(activityFilePath)}`);
             return;
         }
 
-        // Add import after other imports
         const importRegex = /(import\s+[^;]+;\s*)+/;
 
         if (importRegex.test(content)) {
@@ -284,17 +397,16 @@ function addImportToActivity(activityFilePath) {
             );
 
             fs.writeFileSync(activityFilePath, content, 'utf8');
-            console.log(`Added import to ${path.basename(activityFilePath)}`);
+            console.log(`✅ Added import to ${path.basename(activityFilePath)}`);
         } else {
-            console.warn(`Could not find import section in ${path.basename(activityFilePath)}`);
+            console.warn(`⚠️  Could not find import section in ${path.basename(activityFilePath)}`);
         }
     } catch (error) {
-        console.error(`Error modifying ${activityFilePath}:`, error);
+        console.error(`❌ Error modifying ${activityFilePath}:`, error);
     }
 }
 
-function createMainApplicationFile(config, applicationKey, googleSenderId) {
-    // Get the package name from the config 
+function createMainApplicationFile(config, applicationKey, googleSenderId, enableDebugLogs, enablePushPermissions) {
     const packageName = config.android?.package || 'com.anonymous.testapp';
 
     return `package ${packageName};
@@ -305,50 +417,57 @@ import ie.imobile.extremepush.PushConnector;
 
 public class MainApplication extends Application {
     
+    private static final String TAG = "MainApplication";
+    
     @Override
     public void onCreate() {
         super.onCreate();
-        Log.d("MainApplication", "MainApplication onCreate() called!");
-        Log.d("MainApplication", "About to initialize PushConnector with appKey: ${applicationKey}");
+        Log.d(TAG, "MainApplication onCreate() called!");
+        
+        initializeXtremePush();
+    }
+    
+    private void initializeXtremePush() {
+        Log.d(TAG, "Initializing XtremePush with appKey: ${applicationKey}");
         
         try {
-            new PushConnector.Builder("${applicationKey}", "${googleSenderId}")
-                .turnOnDebugLogs(true)
-                .create(this);
-            Log.d("MainApplication", "PushConnector initialized successfully!");
+            PushConnector.Builder builder = new PushConnector.Builder("${applicationKey}", "${googleSenderId}")
+                .turnOnDebugLogs(${enableDebugLogs});
+                
+            builder.create(this);
+            
+            Log.d(TAG, "XtremePush initialized successfully!");
         } catch (Exception e) {
-            Log.e("MainApplication", "Failed to initialize PushConnector: " + e.getMessage());
-            e.printStackTrace();
+            Log.e(TAG, "Failed to initialize XtremePush: " + e.getMessage(), e);
         }
     }
 }
 `;
 }
 
-function addPushConnectorToMainApplication(mainApplicationContents, applicationKey, googleSenderId) {
+function addPushConnectorToMainApplication(mainApplicationContents, applicationKey, googleSenderId, enableDebugLogs, enablePushPermissions) {
     const importStatement = 'import ie.imobile.extremepush.PushConnector';
 
-    // Check if this is a Kotlin file based on content
     const isKotlin = mainApplicationContents.includes('class MainApplication : Application()') ||
         mainApplicationContents.includes('override fun onCreate()') ||
         !mainApplicationContents.includes('public class');
 
     let initializationCode;
     if (isKotlin) {
-        // Kotlin syntax
-        initializationCode = `        PushConnector.Builder("${applicationKey}", "${googleSenderId}")
-            .turnOnDebugLogs(true)
+        initializationCode = `        // Initialize XtremePush
+        PushConnector.Builder("${applicationKey}", "${googleSenderId}")
+            .turnOnDebugLogs(${enableDebugLogs})
             .create(this)`;
     } else {
-        // Java syntax
-        initializationCode = `        new PushConnector.Builder("${applicationKey}", "${googleSenderId}")
-            .turnOnDebugLogs(true)
+        initializationCode = `        // Initialize XtremePush
+        new PushConnector.Builder("${applicationKey}", "${googleSenderId}")
+            .turnOnDebugLogs(${enableDebugLogs})
             .create(this);`;
     }
 
     let modifiedContents = mainApplicationContents;
 
-    // Add import if not already present
+    // Add import if not present
     if (!modifiedContents.includes(importStatement)) {
         const importRegex = /(import\s+[^;\r\n]+[\r\n]+)+/;
 
@@ -357,66 +476,159 @@ function addPushConnectorToMainApplication(mainApplicationContents, applicationK
                 importRegex,
                 `$&${importStatement}\n`
             );
+            console.log('✅ Added PushConnector import');
         }
-        console.log('Added PushConnector import');
     }
 
-    // Add initialization in onCreate method
+    // Add initialization if not present
     if (!modifiedContents.includes('PushConnector.Builder')) {
         if (isKotlin) {
-            // Kotlin patterns
-            const onCreateRegex1 = /(override fun onCreate\(\)\s*{[^}]*)(})/;
-            const onCreateRegex2 = /(super\.onCreate\(\)[^}]*)(})/;
+            const onCreateRegex = /(override fun onCreate\(\)\s*{[^}]*super\.onCreate\(\))/;
 
-            if (onCreateRegex1.test(modifiedContents)) {
+            if (onCreateRegex.test(modifiedContents)) {
                 modifiedContents = modifiedContents.replace(
-                    onCreateRegex1,
-                    `$1\n${initializationCode}\n    $2`
+                    onCreateRegex,
+                    `$1\n\n${initializationCode}`
                 );
-                console.log('Added PushConnector initialization to Kotlin onCreate');
-            } else if (onCreateRegex2.test(modifiedContents)) {
-                modifiedContents = modifiedContents.replace(
-                    onCreateRegex2,
-                    `$1\n${initializationCode}`
-                );
-                console.log('Added PushConnector initialization after Kotlin super.onCreate()');
-            } else {
-                console.warn('Could not find onCreate method in Kotlin MainApplication');
+                console.log('✅ Added PushConnector initialization to Kotlin onCreate');
             }
         } else {
-            // Java patterns
-            const onCreateRegex1 = /(public\s+void\s+onCreate\s*\(\s*\)\s*{[^}]*)(})/;
-            const onCreateRegex2 = /(@Override\s*public\s+void\s+onCreate\s*\(\s*\)\s*{[^}]*)(})/;
-            const onCreateRegex3 = /(super\.onCreate\(\);[^}]*)(})/;
+            const onCreateRegex = /(public void onCreate\(\)\s*{[^}]*super\.onCreate\(\);)/;
+            const overrideRegex = /(@Override\s*public void onCreate\(\)\s*{[^}]*super\.onCreate\(\);)/;
 
-            if (onCreateRegex1.test(modifiedContents)) {
+            if (onCreateRegex.test(modifiedContents)) {
                 modifiedContents = modifiedContents.replace(
-                    onCreateRegex1,
-                    `$1\n${initializationCode}\n    $2`
+                    onCreateRegex,
+                    `$1\n\n${initializationCode}`
                 );
-                console.log('Added PushConnector initialization to Java onCreate (pattern 1)');
-            } else if (onCreateRegex2.test(modifiedContents)) {
+                console.log('✅ Added PushConnector initialization to Java onCreate');
+            } else if (overrideRegex.test(modifiedContents)) {
                 modifiedContents = modifiedContents.replace(
-                    onCreateRegex2,
-                    `$1\n${initializationCode}\n    $2`
+                    overrideRegex,
+                    `$1\n\n${initializationCode}`
                 );
-                console.log('Added PushConnector initialization to Java onCreate (pattern 2)');
-            } else if (onCreateRegex3.test(modifiedContents)) {
+                console.log('✅ Added PushConnector initialization to Java onCreate with @Override');
+            }
+        }
+    } else {
+        console.log('✓ PushConnector initialization already exists');
+    }
+
+    return modifiedContents;
+}
+
+// ========================================
+// iOS HELPER FUNCTIONS
+// ========================================
+
+function addIOSDependencies(podfileContents) {
+    console.log('Adding XtremePush iOS SDK to Podfile...');
+
+    const xpushPod = `  pod 'XPush', :git => 'https://github.com/xtremepush/Xtremepush-iOS-SDK'`;
+
+    if (podfileContents.includes('XPush')) {
+        console.log('✓ XtremePush iOS SDK already exists in Podfile');
+        return podfileContents;
+    }
+
+    const targetRegex = /(target ['"][^'"]+['"] do)/;
+    if (targetRegex.test(podfileContents)) {
+        const modifiedContents = podfileContents.replace(
+            targetRegex,
+            `$1\n${xpushPod}`
+        );
+        console.log('✅ Added XtremePush iOS SDK dependency to Podfile');
+        return modifiedContents;
+    } else {
+        console.warn('⚠️  Could not find target block in Podfile');
+        return podfileContents;
+    }
+}
+
+function addIOSInitialization(appDelegateContents, applicationKey, enableDebugLogs, enablePushPermissions) {
+    console.log('Adding XtremePush initialization to AppDelegate...');
+
+    const isSwift = appDelegateContents.includes('import UIKit') ||
+        appDelegateContents.includes('class AppDelegate') ||
+        appDelegateContents.includes('func application');
+
+    let modifiedContents = appDelegateContents;
+
+    if (isSwift) {
+        console.log('Detected Swift AppDelegate');
+
+        const swiftImport = 'import XPush';
+        const swiftInitCode = `        // Initialize XtremePush
+        XPush.setAppKey("${applicationKey}")
+        ${enableDebugLogs ? `
+        #if DEBUG
+        XPush.setShouldShowDebugLogs(true)
+        #endif` : ''}
+        XPush.setRequestPushPermissions(${enablePushPermissions})
+        XPush.applicationDidFinishLaunching(options: launchOptions)`;
+
+        // Add import
+        if (!modifiedContents.includes(swiftImport)) {
+            const importRegex = /(import UIKit)/;
+            if (importRegex.test(modifiedContents)) {
                 modifiedContents = modifiedContents.replace(
-                    onCreateRegex3,
-                    `$1\n${initializationCode}`
+                    importRegex,
+                    `$1\n${swiftImport}`
                 );
-                console.log('Added PushConnector initialization after Java super.onCreate()');
-            } else {
-                console.warn('Could not find onCreate method in Java MainApplication');
+                console.log('✅ Added XPush import to Swift AppDelegate');
             }
         }
 
-        if (!modifiedContents.includes('PushConnector.Builder')) {
-            console.log('MainApplication content preview:', modifiedContents.substring(0, 500));
+        // Add initialization
+        if (!modifiedContents.includes('XPush.setAppKey')) {
+            const didFinishRegex = /(func application\([^)]+didFinishLaunchingWithOptions[^{]*{)/;
+
+            if (didFinishRegex.test(modifiedContents)) {
+                modifiedContents = modifiedContents.replace(
+                    didFinishRegex,
+                    `$1\n${swiftInitCode}\n`
+                );
+                console.log('✅ Added XPush initialization to Swift AppDelegate');
+            }
         }
+
     } else {
-        console.log('PushConnector initialization already exists');
+        console.log('Detected Objective-C AppDelegate');
+
+        const objcImport = '#import <XPush/XPush.h>';
+        const objcInitCode = `  // Initialize XtremePush
+  [XPush setAppKey: @"${applicationKey}"];
+  ${enableDebugLogs ? `
+  #if DEBUG
+  [XPush setShouldShowDebugLogs:YES];
+  #endif` : ''}
+  [XPush setRequestPushPermissions:${enablePushPermissions ? 'YES' : 'NO'}];
+  [XPush applicationDidFinishLaunchingWithOptions:launchOptions];`;
+
+        // Add import
+        if (!modifiedContents.includes(objcImport)) {
+            const importRegex = /(#import "AppDelegate\.h")/;
+            if (importRegex.test(modifiedContents)) {
+                modifiedContents = modifiedContents.replace(
+                    importRegex,
+                    `$1\n${objcImport}`
+                );
+                console.log('✅ Added XPush import to Objective-C AppDelegate');
+            }
+        }
+
+        // Add initialization
+        if (!modifiedContents.includes('[XPush setAppKey')) {
+            const didFinishRegex = /(- \(BOOL\)application:\(UIApplication \*\)application didFinishLaunchingWithOptions:\(NSDictionary \*\)launchOptions\s*{)/;
+
+            if (didFinishRegex.test(modifiedContents)) {
+                modifiedContents = modifiedContents.replace(
+                    didFinishRegex,
+                    `$1\n${objcInitCode}`
+                );
+                console.log('✅ Added XPush initialization to Objective-C AppDelegate');
+            }
+        }
     }
 
     return modifiedContents;

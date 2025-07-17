@@ -6,7 +6,6 @@ const {
     withMainApplication,
     withDangerousMod,
     // iOS imports
-    withPodfile,
     withAppDelegate,
     withXcodeProject,
     withInfoPlist
@@ -189,11 +188,22 @@ const withXPExpoPlugin = (config, pluginConfig) => {
     // ========================================
 
     // iOS Podfile
-    config = withPodfile(config, (config) => {
-        console.log('📦 Configuring iOS Podfile...');
-        config.modResults.contents = addIOSDependencies(config.modResults.contents);
-        return config;
-    });
+    config = withDangerousMod(config, [
+        'ios',
+        async (config) => {
+            console.log('📦 Configuring iOS Podfile...');
+            const podfilePath = path.join(config.modRequest.projectRoot, 'ios', 'Podfile');
+            if (fs.existsSync(podfilePath)) {
+                let podfileContents = fs.readFileSync(podfilePath, 'utf8');
+                podfileContents = addIOSDependencies(podfileContents);
+                fs.writeFileSync(podfilePath, podfileContents, 'utf8');
+                console.log('✅ Updated iOS Podfile');
+            } else {
+                console.warn('⚠️  iOS Podfile not found');
+            }
+            return config;
+        },
+    ]);
 
     // iOS AppDelegate
     config = withAppDelegate(config, (config) => {

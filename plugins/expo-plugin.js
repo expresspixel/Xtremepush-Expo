@@ -218,9 +218,41 @@ const withXPExpoPlugin = (config, pluginConfig) => {
     });
 
     // Add supporting iOS files to Xcode project
+    config = withDangerousMod(config, [
+        'ios',
+        async (config) => {
+            console.log('📁 Adding iOS supporting files to Xcode project...');
+            await addIOSSupportingFiles(config.modRequest.projectRoot);
+            return config;
+        },
+    ]);
+
+    // Try to add files to Xcode project if possible
     config = withXcodeProject(config, (config) => {
-        console.log('📁 Adding iOS supporting files to Xcode project...');
-        addIOSSupportingFiles(config.modResults);
+        try {
+            console.log('🔗 Attempting to link iOS files to Xcode project...');
+            const iosProjectPath = path.join(config.modRequest.projectRoot, 'ios');
+
+            // Add RNXtremepushReact.h if it exists
+            const headerPath = path.join(iosProjectPath, 'RNXtremepushReact.h');
+            if (fs.existsSync(headerPath)) {
+                config.modResults.addSourceFile('RNXtremepushReact.h', {
+                    target: config.modResults.getFirstTarget().uuid
+                });
+                console.log('✅ Linked RNXtremepushReact.h to Xcode project');
+            }
+
+            // Add RNXtremepushReact.m if it exists
+            const implementationPath = path.join(iosProjectPath, 'RNXtremepushReact.m');
+            if (fs.existsSync(implementationPath)) {
+                config.modResults.addSourceFile('RNXtremepushReact.m', {
+                    target: config.modResults.getFirstTarget().uuid
+                });
+                console.log('✅ Linked RNXtremepushReact.m to Xcode project');
+            }
+        } catch (error) {
+            console.warn('⚠️  Could not link files to Xcode project (this is normal for managed workflow):', error.message);
+        }
         return config;
     });
 
@@ -362,29 +394,42 @@ async function addAndroidSupportingFiles(projectRoot, packageName) {
     }
 }
 
-function addIOSSupportingFiles(xcodeProject) {
+async function addIOSSupportingFiles(projectRoot) {
     const iosPath = path.join(__dirname, 'supporting-files', 'ios');
+    const iosProjectPath = path.join(projectRoot, 'ios');
 
     try {
+        // Create ios directory if it doesn't exist
+        if (!fs.existsSync(iosProjectPath)) {
+            fs.mkdirSync(iosProjectPath, { recursive: true });
+        }
+
         // Add RNXtremepushReact.h
-        const headerPath = path.join(iosPath, 'RNXtremepushReact.h');
-        if (fs.existsSync(headerPath)) {
-            xcodeProject.addSourceFile(headerPath, {
-                target: xcodeProject.getFirstTarget().uuid
-            });
-            console.log('✅ Added RNXtremepushReact.h to Xcode project');
+        const headerSourcePath = path.join(iosPath, 'RNXtremepushReact.h');
+        const headerDestPath = path.join(iosProjectPath, 'RNXtremepushReact.h');
+
+        if (fs.existsSync(headerSourcePath)) {
+            // Copy file to iOS project directory
+            fs.copyFileSync(headerSourcePath, headerDestPath);
+            console.log('✅ Added RNXtremepushReact.h to iOS project');
+        } else {
+            console.warn('⚠️  RNXtremepushReact.h not found in supporting files');
         }
 
         // Add RNXtremepushReact.m
-        const implementationPath = path.join(iosPath, 'RNXtremepushReact.m');
-        if (fs.existsSync(implementationPath)) {
-            xcodeProject.addSourceFile(implementationPath, {
-                target: xcodeProject.getFirstTarget().uuid
-            });
-            console.log('✅ Added RNXtremepushReact.m to Xcode project');
+        const implementationSourcePath = path.join(iosPath, 'RNXtremepushReact.m');
+        const implementationDestPath = path.join(iosProjectPath, 'RNXtremepushReact.m');
+
+        if (fs.existsSync(implementationSourcePath)) {
+            // Copy file to iOS project directory
+            fs.copyFileSync(implementationSourcePath, implementationDestPath);
+            console.log('✅ Added RNXtremepushReact.m to iOS project');
+        } else {
+            console.warn('⚠️  RNXtremepushReact.m not found in supporting files');
         }
     } catch (error) {
         console.error('❌ Error adding iOS supporting files:', error);
+        console.error('Error details:', error.message);
     }
 }
 

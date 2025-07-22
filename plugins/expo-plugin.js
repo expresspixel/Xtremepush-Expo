@@ -845,7 +845,7 @@ function addIOSInitialization(appDelegateContents, applicationKey, enableDebugLo
     if (isSwift) {
         console.log('Detected Swift AppDelegate');
 
-        const swiftImport = 'import XPush';
+        const swiftImport = 'import XtremePushSDK';
         const swiftInitCode = `        // Initialize XtremePush
         XPush.setAppKey("${applicationKey}")
         ${enableDebugLogs ? `

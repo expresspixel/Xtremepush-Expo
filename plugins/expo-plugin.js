@@ -852,7 +852,7 @@ function addIOSInitialization(appDelegateContents, applicationKey, enableDebugLo
         #if DEBUG
         XPush.setShouldShowDebugLogs(true)
         #endif` : ''}
-        XPush.setRequestPushPermissions(${enablePushPermissions})
+        //XPush.setRequestPushPermissions(${enablePushPermissions})
         XPush.applicationDidFinishLaunching(options: launchOptions)`;
 
         // Add import

@@ -812,7 +812,7 @@ function addPushConnectorToMainApplication(mainApplicationContents, applicationK
 function addIOSDependencies(podfileContents) {
     console.log('Adding XtremePush iOS SDK to Podfile...');
 
-    const xpushPod = `  pod 'XtremePushSDK', :git => 'https://github.com/xtremepush/Xtremepush-iOS-SDK'`;
+    const xpushPod = `  pod 'Xtremepush-iOS-SDK', :git => 'https://github.com/xtremepush/Xtremepush-iOS-SDK'`;
 
     if (podfileContents.includes('XPush')) {
         console.log('✓ XtremePush iOS SDK already exists in Podfile');
@@ -845,7 +845,7 @@ function addIOSInitialization(appDelegateContents, applicationKey, enableDebugLo
     if (isSwift) {
         console.log('Detected Swift AppDelegate');
 
-        const swiftImport = 'import XtremePushSDK';
+        const swiftImport = 'import XPush';
         const swiftInitCode = `        // Initialize XtremePush
         XPush.setAppKey("${applicationKey}")
         ${enableDebugLogs ? `

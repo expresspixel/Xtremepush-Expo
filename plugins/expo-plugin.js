@@ -855,16 +855,10 @@ function addIOSInitialization(appDelegateContents, applicationKey, enableDebugLo
         //XPush.setRequestPushPermissions(${enablePushPermissions})
         XPush.applicationDidFinishLaunching(options: launchOptions)`;
 
-        // Add import
+        // Add import at the very beginning of the file
         if (!modifiedContents.includes(swiftImport)) {
-            const importRegex = /(import Expo)/;
-            if (importRegex.test(modifiedContents)) {
-                modifiedContents = modifiedContents.replace(
-                    importRegex,
-                    `$1\n${swiftImport}`
-                );
-                console.log('✅ Added XPush import to Swift AppDelegate');
-            }
+            modifiedContents = `${swiftImport}\n${modifiedContents}`;
+            console.log('✅ Added XPush import to Swift AppDelegate');
         }
 
         // Add initialization

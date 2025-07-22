@@ -857,7 +857,7 @@ function addIOSInitialization(appDelegateContents, applicationKey, enableDebugLo
 
         // Add import
         if (!modifiedContents.includes(swiftImport)) {
-            const importRegex = /(import UIKit)/;
+            const importRegex = /(import Expo)/;
             if (importRegex.test(modifiedContents)) {
                 modifiedContents = modifiedContents.replace(
                     importRegex,

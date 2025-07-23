@@ -786,24 +786,36 @@ public class MainApplication extends Application implements ReactApplication {
 
 function addPushConnectorToMainApplication(mainApplicationContents, applicationKey, googleSenderId, enableDebugLogs, enablePushPermissions) {
     const importStatement = 'import ie.imobile.extremepush.PushConnector';
-    const reactPackageImport = 'import RNXtremepushReactPackage';
+    
+    // Get the package name from the MainApplication file
+    const packageMatch = mainApplicationContents.match(/package\s+([^;\s\n]+)/);
+    const packageName = packageMatch ? packageMatch[1] : 'com.anonymous.testapp';
+    
+    const reactPackageImport = `import ${packageName}.RNXtremepushReactPackage`;
 
     const isKotlin = mainApplicationContents.includes('class MainApplication : Application()') ||
         mainApplicationContents.includes('override fun onCreate()') ||
+        mainApplicationContents.includes('fun ') ||
         !mainApplicationContents.includes('public class');
 
     let initializationCode;
     if (isKotlin) {
-        initializationCode = `        // Initialize XtremePush\n        PushConnector.Builder(\"${applicationKey}\", \"${googleSenderId}\")\n            .turnOnDebugLogs(${enableDebugLogs})\n            .create(this)`;
+        initializationCode = `        // Initialize XtremePush
+        PushConnector.Builder("${applicationKey}", "${googleSenderId}")
+            .turnOnDebugLogs(${enableDebugLogs})
+            .create(this)`;
     } else {
-        initializationCode = `        // Initialize XtremePush\n        new PushConnector.Builder(\"${applicationKey}\", \"${googleSenderId}\")\n            .turnOnDebugLogs(${enableDebugLogs})\n            .create(this);`;
+        initializationCode = `        // Initialize XtremePush
+        new PushConnector.Builder("${applicationKey}", "${googleSenderId}")
+            .turnOnDebugLogs(${enableDebugLogs})
+            .create(this);`;
     }
 
     let modifiedContents = mainApplicationContents;
 
     // Add imports if not present
     if (!modifiedContents.includes(importStatement)) {
-        const importRegex = /(import\s+[^;\r\n]+[\r\n]+)+/;
+        const importRegex = /(import\s+[^\r\n]+[\r\n]+)+/;
         if (importRegex.test(modifiedContents)) {
             modifiedContents = modifiedContents.replace(
                 importRegex,
@@ -815,7 +827,7 @@ function addPushConnectorToMainApplication(mainApplicationContents, applicationK
 
     // Add ReactPackage import if not present
     if (!modifiedContents.includes('RNXtremepushReactPackage')) {
-        const importRegex = /(import\s+[^;\r\n]+[\r\n]+)+/;
+        const importRegex = /(import\s+[^\r\n]+[\r\n]+)+/;
         if (importRegex.test(modifiedContents)) {
             modifiedContents = modifiedContents.replace(
                 importRegex,
@@ -825,24 +837,47 @@ function addPushConnectorToMainApplication(mainApplicationContents, applicationK
         }
     }
 
-    // Robustly add RNXtremepushReactPackage to getPackages()
-    if (modifiedContents.includes('getPackages()') && !/packages\.add\(new RNXtremepushReactPackage\(\)\)/.test(modifiedContents)) {
-        // Find the getPackages() method
-        const getPackagesRegex = /(protected List<ReactPackage> getPackages\(\)\s*\{[\s\S]*?List<ReactPackage> packages = new PackageList\(this\)\.getPackages\(\);[\s\S]*?)(return packages;)/;
-        if (getPackagesRegex.test(modifiedContents)) {
-            modifiedContents = modifiedContents.replace(
-                getPackagesRegex,
-                (match, beforeReturn, returnLine) => {
-                    // Insert after the packages list is created, before return
-                    return (
-                        beforeReturn +
-                        '      // XtremePush: Add the RNXtremepushReactPackage\n' +
-                        '      packages.add(new RNXtremepushReactPackage());\n' +
-                        returnLine
-                    );
-                }
-            );
-            console.log('✅ Robustly added RNXtremepushReactPackage to getPackages method');
+    // Handle Kotlin vs Java package registration differently
+    if (isKotlin) {
+        console.log('Detected Kotlin MainApplication - adding package to getPackages()');
+        
+        // For Kotlin, look for the packages list and add our package
+        if (modifiedContents.includes('getPackages()') && !/packages\.add\(RNXtremepushReactPackage\(\)\)/.test(modifiedContents)) {
+            // Find the getPackages() method in Kotlin
+            const getPackagesRegex = /(override fun getPackages\(\): List<ReactPackage>\s*[{=][^}]*val packages = PackageList\(this\)\.packages[^}]*)(return packages)/;
+            if (getPackagesRegex.test(modifiedContents)) {
+                modifiedContents = modifiedContents.replace(
+                    getPackagesRegex,
+                    (match, beforeReturn, returnLine) => {
+                        return (
+                            beforeReturn +
+                            '      // XtremePush: Add the RNXtremepushReactPackage\n' +
+                            '      packages.add(RNXtremepushReactPackage())\n' +
+                            '      ' + returnLine
+                        );
+                    }
+                );
+                console.log('✅ Added RNXtremepushReactPackage to Kotlin getPackages method');
+            }
+        }
+    } else {
+        // Java version (existing logic)
+        if (modifiedContents.includes('getPackages()') && !/packages\.add\(new RNXtremepushReactPackage\(\)\)/.test(modifiedContents)) {
+            const getPackagesRegex = /(protected List<ReactPackage> getPackages\(\)\s*\{[\s\S]*?List<ReactPackage> packages = new PackageList\(this\)\.getPackages\(\);[\s\S]*?)(return packages;)/;
+            if (getPackagesRegex.test(modifiedContents)) {
+                modifiedContents = modifiedContents.replace(
+                    getPackagesRegex,
+                    (match, beforeReturn, returnLine) => {
+                        return (
+                            beforeReturn +
+                            '      // XtremePush: Add the RNXtremepushReactPackage\n' +
+                            '      packages.add(new RNXtremepushReactPackage());\n' +
+                            '      ' + returnLine
+                        );
+                    }
+                );
+                console.log('✅ Added RNXtremepushReactPackage to Java getPackages method');
+            }
         }
     }
 

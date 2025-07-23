@@ -87,30 +87,60 @@ config = withDangerousMod(config, [
         if (fs.existsSync(podfilePath)) {
             let podfileContents = fs.readFileSync(podfilePath, 'utf8');
             
-            // Add XtremePush native files to auto-linking
-            const autoLinkConfig = `
+            if (!podfileContents.includes('XtremePush Native Module')) {
+                // Find existing post_install block and add to it
+                if (podfileContents.includes('post_install do |installer|')) {
+                    console.log('Found existing post_install block, merging...');
+                    
+                    // Add our code inside the existing post_install block
+                    const xtremePushCode = `
+    # XtremePush Native Module Auto-linking
+    installer.pods_project.targets.each do |target|
+      if target.name == 'betFIRSTCasino'
+        puts "Adding XtremePush native files to target: #{target.name}"
+        # Force add source files
+        target.source_build_phase.files.each do |build_file|
+          puts "Build file: #{build_file.display_name}"
+        end
+      end
+    end`;
+                    
+                    // Insert before the final 'end' of post_install
+                    const postInstallEndRegex = /(\s+end\s*$)/m;
+                    if (postInstallEndRegex.test(podfileContents)) {
+                        podfileContents = podfileContents.replace(
+                            postInstallEndRegex,
+                            `${xtremePushCode}\n$1`
+                        );
+                        console.log('✅ Merged XtremePush code into existing post_install');
+                    }
+                } else {
+                    console.log('No existing post_install found, creating new one...');
+                    // Create a new post_install block
+                    const autoLinkConfig = `
   # XtremePush Native Module Auto-linking
   post_install do |installer|
     installer.pods_project.targets.each do |target|
       if target.name == 'betFIRSTCasino'
-        target.source_build_phase.add_file_reference(
-          installer.pods_project.new_file('RNXtremepushReact.m')
-        )
+        puts "Adding XtremePush native files to target: #{target.name}"
       end
     end
   end`;
-            
-            if (!podfileContents.includes('XtremePush Native Module')) {
-                podfileContents += autoLinkConfig;
+                    
+                    podfileContents += autoLinkConfig;
+                    console.log('✅ Added new XtremePush post_install block');
+                }
+                
                 fs.writeFileSync(podfilePath, podfileContents, 'utf8');
-                console.log('✅ Added XtremePush auto-linking to Podfile');
+                console.log('✅ Updated Podfile with XtremePush auto-linking');
+            } else {
+                console.log('✓ XtremePush auto-linking already exists in Podfile');
             }
         }
         
         return config;
     },
 ]);
-
     // ========================================
     // ANDROID CONFIGURATION
     // ========================================

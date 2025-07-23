@@ -855,16 +855,27 @@ function addIOSInitialization(appDelegateContents, applicationKey, enableDebugLo
         //XPush.setRequestPushPermissions(${enablePushPermissions})
         XPush.applicationDidFinishLaunching(options: launchOptions)`;
 
-        // Add import at the very beginning of the file
+        console.log('🔍 DEBUGGING - Original file content (first 500 chars):');
+        console.log(modifiedContents.substring(0, 500));
+        
+        console.log('🔍 DEBUGGING - Looking for import XPush...');
+        console.log('Contains import XPush?', modifiedContents.includes(swiftImport));
+        
+        // Add import at the very beginning
         if (!modifiedContents.includes(swiftImport)) {
+            console.log('🔍 DEBUGGING - Adding import at beginning');
             modifiedContents = `${swiftImport}\n${modifiedContents}`;
             console.log('✅ Added XPush import to Swift AppDelegate');
+        } else {
+            console.log('⚠️ Import XPush already exists');
         }
-
-        // Add initialization
+        
+        console.log('🔍 DEBUGGING - After adding import (first 500 chars):');
+        console.log(modifiedContents.substring(0, 500));
+        
+        // Add initialization code
         if (!modifiedContents.includes('XPush.setAppKey')) {
             const didFinishRegex = /(func application\([^)]+didFinishLaunchingWithOptions[^{]*{)/;
-
             if (didFinishRegex.test(modifiedContents)) {
                 modifiedContents = modifiedContents.replace(
                     didFinishRegex,
@@ -873,6 +884,9 @@ function addIOSInitialization(appDelegateContents, applicationKey, enableDebugLo
                 console.log('✅ Added XPush initialization to Swift AppDelegate');
             }
         }
+        
+        console.log('🔍 DEBUGGING - Final file content (first 500 chars):');
+        console.log(modifiedContents.substring(0, 500));
 
     } else {
         console.log('Detected Objective-C AppDelegate');

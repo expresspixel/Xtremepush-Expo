@@ -234,63 +234,50 @@ const withXPExpoPlugin = (config, pluginConfig) => {
             const projectRoot = config.modRequest.projectRoot;
             const iosProjectPath = path.join(projectRoot, 'ios');
     
-            const implementationPath = path.join(iosProjectPath, 'RNXtremepushReact.m');
-            
-            if (fs.existsSync(implementationPath)) {
-                console.log('📄 Debugging addFile method...');
-                
-                // Debug the config.modResults object structure
-                console.log('config.modResults type:', typeof config.modResults);
-                console.log('config.modResults.addFile type:', typeof config.modResults.addFile);
-                
-                // Check what methods are actually available
-                const methods = Object.getOwnPropertyNames(config.modResults);
-                console.log('Available methods on config.modResults:', methods.filter(m => typeof config.modResults[m] === 'function'));
-                
-                // Try to understand the target structure
-                const firstTarget = config.modResults.getFirstTarget();
-                console.log('First target structure keys:', Object.keys(firstTarget));
-                console.log('First target UUID:', firstTarget.uuid);
-                console.log('First target.firstTarget keys:', firstTarget.firstTarget ? Object.keys(firstTarget.firstTarget) : 'null');
-                
-                // Debug the failing addFile call step by step
-                console.log('🔍 Testing addFile parameters...');
-                const relativePath = 'RNXtremepushReact.m';
-                const options = { target: firstTarget.uuid };
-                
-                console.log('relativePath:', relativePath);
-                console.log('options:', options);
-                console.log('options.target type:', typeof options.target);
-                
+            const firstTarget = config.modResults.getFirstTarget();
+            console.log('Target UUID:', firstTarget.uuid);
+    
+            // Add RNXtremepushReact.h
+            const headerPath = path.join(iosProjectPath, 'RNXtremepushReact.h');
+            if (fs.existsSync(headerPath)) {
                 try {
-                    // Try with different parameter combinations
-                    console.log('Trying addFile with minimal params...');
-                    const result1 = config.modResults.addFile(relativePath);
-                    console.log('addFile with just path succeeded:', result1);
-                } catch (error1) {
-                    console.log('addFile with just path failed:', error1.message);
-                    console.log('Error stack:', error1.stack);
-                    
-                    // Try a different approach - check if it's actually addSourceFile
-                    try {
-                        console.log('Trying addSourceFile instead...');
-                        const result2 = config.modResults.addSourceFile(relativePath, {}, firstTarget.uuid);
-                        console.log('addSourceFile succeeded:', result2);
-                    } catch (error2) {
-                        console.log('addSourceFile also failed:', error2.message);
-                        
-                        // Try checking the source of the xcode library
-                        console.log('Available pbx methods:', 
-                            Object.getOwnPropertyNames(config.modResults)
-                                .filter(prop => prop.includes('pbx') || prop.includes('add'))
-                        );
-                    }
+                    const headerResult = config.modResults.addSourceFile('RNXtremepushReact.h', {}, firstTarget.uuid);
+                    console.log('✅ Added RNXtremepushReact.h to Xcode project (result:', headerResult, ')');
+                } catch (headerError) {
+                    console.warn('⚠️  Failed to add header file:', headerError.message);
                 }
             }
     
+            // Add RNXtremepushReact.m
+            const implementationPath = path.join(iosProjectPath, 'RNXtremepushReact.m');
+            if (fs.existsSync(implementationPath)) {
+                try {
+                    const implResult = config.modResults.addSourceFile('RNXtremepushReact.m', {}, firstTarget.uuid);
+                    console.log('✅ Added RNXtremepushReact.m to Xcode project (result:', implResult, ')');
+                    
+                    // The method works even if it returns false, so let's also try to add to build phase
+                    try {
+                        if (config.modResults.addToPbxSourcesBuildPhase) {
+                            // Try to add to build phase if possible
+                            const buildPhaseResult = config.modResults.addToPbxSourcesBuildPhase({
+                                uuid: 'RNXtremepushReact.m',
+                                target: firstTarget.uuid
+                            });
+                            console.log('✅ Added to build phase (result:', buildPhaseResult, ')');
+                        }
+                    } catch (buildPhaseError) {
+                        console.log('⚠️  Build phase addition failed (this might be OK):', buildPhaseError.message);
+                    }
+                    
+                } catch (implError) {
+                    console.warn('⚠️  Failed to add implementation file:', implError.message);
+                }
+            }
+    
+            console.log('✅ Xcode project file linking complete');
+    
         } catch (error) {
             console.warn('⚠️  Could not link files to Xcode project:', error.message);
-            console.warn('Full error stack:', error.stack);
         }
         return config;
     });

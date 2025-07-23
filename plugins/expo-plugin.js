@@ -88,53 +88,46 @@ config = withDangerousMod(config, [
             let podfileContents = fs.readFileSync(podfilePath, 'utf8');
             
             if (!podfileContents.includes('XtremePush Native Module')) {
-                // Find existing post_install block and add to it
-                if (podfileContents.includes('post_install do |installer|')) {
-                    console.log('Found existing post_install block, merging...');
+                console.log('🔍 Debugging Podfile structure...');
+                console.log('Podfile contains post_install:', podfileContents.includes('post_install do |installer|'));
+                
+                // More precise regex to find the post_install block ending
+                const postInstallBlockRegex = /(post_install do \|installer\|[\s\S]*?)(\n\s*end\s*$)/m;
+                const match = podfileContents.match(postInstallBlockRegex);
+                
+                if (match) {
+                    console.log('Found post_install block, inserting XtremePush code...');
                     
-                    // Add our code inside the existing post_install block
                     const xtremePushCode = `
     # XtremePush Native Module Auto-linking
     installer.pods_project.targets.each do |target|
       if target.name == 'betFIRSTCasino'
-        puts "Adding XtremePush native files to target: #{target.name}"
-        # Force add source files
-        target.source_build_phase.files.each do |build_file|
-          puts "Build file: #{build_file.display_name}"
-        end
+        puts "XtremePush: Found target #{target.name}"
       end
     end`;
                     
-                    // Insert before the final 'end' of post_install
-                    const postInstallEndRegex = /(\s+end\s*$)/m;
-                    if (postInstallEndRegex.test(podfileContents)) {
-                        podfileContents = podfileContents.replace(
-                            postInstallEndRegex,
-                            `${xtremePushCode}\n$1`
-                        );
-                        console.log('✅ Merged XtremePush code into existing post_install');
-                    }
-                } else {
-                    console.log('No existing post_install found, creating new one...');
-                    // Create a new post_install block
-                    const autoLinkConfig = `
-  # XtremePush Native Module Auto-linking
-  post_install do |installer|
-    installer.pods_project.targets.each do |target|
-      if target.name == 'betFIRSTCasino'
-        puts "Adding XtremePush native files to target: #{target.name}"
-      end
-    end
-  end`;
+                    // Replace the matched block with our code inserted before the final 'end'
+                    const updatedBlock = match[1] + xtremePushCode + match[2];
+                    podfileContents = podfileContents.replace(postInstallBlockRegex, updatedBlock);
                     
-                    podfileContents += autoLinkConfig;
-                    console.log('✅ Added new XtremePush post_install block');
+                    console.log('✅ Successfully inserted XtremePush code into post_install block');
+                } else {
+                    console.log('❌ Could not find post_install block structure');
+                    // Fallback: just append at the end of file
+                    const fallbackConfig = `
+# XtremePush Native Module Auto-linking
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    if target.name == 'betFIRSTCasino'
+      puts "XtremePush: Found target #{target.name}"
+    end
+  end
+end`;
+                    podfileContents += fallbackConfig;
+                    console.log('✅ Added fallback XtremePush post_install block');
                 }
                 
                 fs.writeFileSync(podfilePath, podfileContents, 'utf8');
-                console.log('✅ Updated Podfile with XtremePush auto-linking');
-            } else {
-                console.log('✓ XtremePush auto-linking already exists in Podfile');
             }
         }
         

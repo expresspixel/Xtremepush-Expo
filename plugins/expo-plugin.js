@@ -234,80 +234,63 @@ const withXPExpoPlugin = (config, pluginConfig) => {
             const projectRoot = config.modRequest.projectRoot;
             const iosProjectPath = path.join(projectRoot, 'ios');
     
-            // First, ensure the project is properly loaded
-            console.log('📋 Project sections before:', {
-                buildFiles: Object.keys(config.modResults.pbxBuildFileSection || {}).length,
-                fileRefs: Object.keys(config.modResults.pbxFileReferenceSection || {}).length
-            });
-    
-            // Initialize sections if they're empty
-            if (!config.modResults.pbxBuildFileSection || Object.keys(config.modResults.pbxBuildFileSection).length === 0) {
-                console.log('⚠️  Pbx project sections not initialized, attempting manual initialization...');
-                
-                // Force a project parse by accessing internal methods
-                if (config.modResults.pbxGroupByName) {
-                    const mainGroup = config.modResults.pbxGroupByName('betFIRSTCasino');
-                    console.log('Main group found:', !!mainGroup);
-                }
-            }
-    
-            // Check file existence
-            const headerPath = path.join(iosProjectPath, 'RNXtremepushReact.h');
             const implementationPath = path.join(iosProjectPath, 'RNXtremepushReact.m');
             
             if (fs.existsSync(implementationPath)) {
-                console.log('📄 Adding RNXtremepushReact.m to project...');
+                console.log('📄 Debugging addFile method...');
+                
+                // Debug the config.modResults object structure
+                console.log('config.modResults type:', typeof config.modResults);
+                console.log('config.modResults.addFile type:', typeof config.modResults.addFile);
+                
+                // Check what methods are actually available
+                const methods = Object.getOwnPropertyNames(config.modResults);
+                console.log('Available methods on config.modResults:', methods.filter(m => typeof config.modResults[m] === 'function'));
+                
+                // Try to understand the target structure
+                const firstTarget = config.modResults.getFirstTarget();
+                console.log('First target structure keys:', Object.keys(firstTarget));
+                console.log('First target UUID:', firstTarget.uuid);
+                console.log('First target.firstTarget keys:', firstTarget.firstTarget ? Object.keys(firstTarget.firstTarget) : 'null');
+                
+                // Debug the failing addFile call step by step
+                console.log('🔍 Testing addFile parameters...');
+                const relativePath = 'RNXtremepushReact.m';
+                const options = { target: firstTarget.uuid };
+                
+                console.log('relativePath:', relativePath);
+                console.log('options:', options);
+                console.log('options.target type:', typeof options.target);
                 
                 try {
-                    // Try with the working directory context
-                    const relativePath = path.relative(iosProjectPath, implementationPath);
-                    console.log('Using relative path:', relativePath);
+                    // Try with different parameter combinations
+                    console.log('Trying addFile with minimal params...');
+                    const result1 = config.modResults.addFile(relativePath);
+                    console.log('addFile with just path succeeded:', result1);
+                } catch (error1) {
+                    console.log('addFile with just path failed:', error1.message);
+                    console.log('Error stack:', error1.stack);
                     
-                    const pbxFile = config.modResults.addFile(relativePath, {
-                        target: config.modResults.getFirstTarget().uuid
-                    });
-                    
-                    if (pbxFile) {
-                        console.log('✅ Successfully added file to Xcode project');
-                        console.log('File reference UUID:', pbxFile.uuid);
-                    } else {
-                        console.log('⚠️  addFile returned null/undefined');
-                    }
-                    
-                } catch (addError) {
-                    console.log('❌ Failed to add file:', addError.message);
-                    
-                    // Last resort: manually add to project structure
-                    console.log('🔧 Attempting manual project structure addition...');
+                    // Try a different approach - check if it's actually addSourceFile
                     try {
-                        // Create file reference manually
-                        const uuid = config.modResults.generateUuid();
-                        const fileRef = {
-                            isa: 'PBXFileReference',
-                            lastKnownFileType: 'sourcecode.c.objc',
-                            name: 'RNXtremepushReact.m',
-                            path: 'RNXtremepushReact.m',
-                            sourceTree: '"<group>"'
-                        };
+                        console.log('Trying addSourceFile instead...');
+                        const result2 = config.modResults.addSourceFile(relativePath, {}, firstTarget.uuid);
+                        console.log('addSourceFile succeeded:', result2);
+                    } catch (error2) {
+                        console.log('addSourceFile also failed:', error2.message);
                         
-                        config.modResults.pbxFileReferenceSection = config.modResults.pbxFileReferenceSection || {};
-                        config.modResults.pbxFileReferenceSection[uuid] = fileRef;
-                        config.modResults.pbxFileReferenceSection[uuid + '_comment'] = 'RNXtremepushReact.m';
-                        
-                        console.log('✅ Manually added file reference to project');
-                    } catch (manualError) {
-                        console.log('❌ Manual addition also failed:', manualError.message);
+                        // Try checking the source of the xcode library
+                        console.log('Available pbx methods:', 
+                            Object.getOwnPropertyNames(config.modResults)
+                                .filter(prop => prop.includes('pbx') || prop.includes('add'))
+                        );
                     }
                 }
             }
     
-            console.log('📋 Project sections after:', {
-                buildFiles: Object.keys(config.modResults.pbxBuildFileSection || {}).length,
-                fileRefs: Object.keys(config.modResults.pbxFileReferenceSection || {}).length
-            });
-    
         } catch (error) {
             console.warn('⚠️  Could not link files to Xcode project:', error.message);
+            console.warn('Full error stack:', error.stack);
         }
         return config;
     });

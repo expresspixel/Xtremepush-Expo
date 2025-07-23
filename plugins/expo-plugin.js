@@ -236,18 +236,20 @@ const withXPExpoPlugin = (config, pluginConfig) => {
             // Add RNXtremepushReact.h if it exists
             const headerPath = path.join(iosProjectPath, 'RNXtremepushReact.h');
             if (fs.existsSync(headerPath)) {
-                config.modResults.addSourceFile('RNXtremepushReact.h', {
-                    target: config.modResults.getFirstTarget().uuid
-                });
+                const pbxFile = config.modResults.addSourceFile('RNXtremepushReact.h');
+                if (pbxFile) {
+                    config.modResults.addToPbxSourcesBuildPhase(pbxFile);
+                }
                 console.log('✅ Linked RNXtremepushReact.h to Xcode project');
             }
-
+            
             // Add RNXtremepushReact.m if it exists
             const implementationPath = path.join(iosProjectPath, 'RNXtremepushReact.m');
             if (fs.existsSync(implementationPath)) {
-                config.modResults.addSourceFile('RNXtremepushReact.m', {
-                    target: config.modResults.getFirstTarget().uuid
-                });
+                const pbxFile = config.modResults.addSourceFile('RNXtremepushReact.m');
+                if (pbxFile) {
+                    config.modResults.addToPbxSourcesBuildPhase(pbxFile);
+                }
                 console.log('✅ Linked RNXtremepushReact.m to Xcode project');
             }
         } catch (error) {

@@ -76,6 +76,41 @@ const withXPExpoPlugin = (config, pluginConfig) => {
         },
     ]);
 
+config = withDangerousMod(config, [
+    'ios',
+    async (config) => {
+        console.log('📝 Ensuring native module auto-linking...');
+        
+        const projectRoot = config.modRequest.projectRoot;
+        const podfilePath = path.join(projectRoot, 'ios', 'Podfile');
+        
+        if (fs.existsSync(podfilePath)) {
+            let podfileContents = fs.readFileSync(podfilePath, 'utf8');
+            
+            // Add XtremePush native files to auto-linking
+            const autoLinkConfig = `
+  # XtremePush Native Module Auto-linking
+  post_install do |installer|
+    installer.pods_project.targets.each do |target|
+      if target.name == 'betFIRSTCasino'
+        target.source_build_phase.add_file_reference(
+          installer.pods_project.new_file('RNXtremepushReact.m')
+        )
+      end
+    end
+  end`;
+            
+            if (!podfileContents.includes('XtremePush Native Module')) {
+                podfileContents += autoLinkConfig;
+                fs.writeFileSync(podfilePath, podfileContents, 'utf8');
+                console.log('✅ Added XtremePush auto-linking to Podfile');
+            }
+        }
+        
+        return config;
+    },
+]);
+
     // ========================================
     // ANDROID CONFIGURATION
     // ========================================

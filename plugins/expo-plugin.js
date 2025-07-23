@@ -231,6 +231,16 @@ end`;
         },
     ]);
 
+    // Copy google-services.json to Android app directory
+    config = withDangerousMod(config, [
+        'android',
+        async (config) => {
+            console.log('📄 Copying google-services.json...');
+            await copyGoogleServicesJson(config.modRequest.projectRoot);
+            return config;
+        },
+    ]);
+    
     // Add imports to activities
     config = withDangerousMod(config, [
         'android',
@@ -330,6 +340,35 @@ end`;
 // ========================================
 // FILE COPYING FUNCTIONS
 // ========================================
+
+async function copyGoogleServicesJson(projectRoot) {
+    const sourceJsonPath = path.join(projectRoot, 'google-services.json');
+    const destJsonPath = path.join(projectRoot, 'android', 'app', 'google-services.json');
+
+    try {
+        if (!fs.existsSync(sourceJsonPath)) {
+            console.warn('⚠️  google-services.json not found in project root');
+            return;
+        }
+
+        if (fs.existsSync(destJsonPath)) {
+            console.log('✓ google-services.json already exists in android/app/');
+            return;
+        }
+
+        // Ensure android/app directory exists
+        const androidAppDir = path.join(projectRoot, 'android', 'app');
+        if (!fs.existsSync(androidAppDir)) {
+            fs.mkdirSync(androidAppDir, { recursive: true });
+            console.log('📁 Created android/app directory');
+        }
+
+        fs.copyFileSync(sourceJsonPath, destJsonPath);
+        console.log('✅ Copied google-services.json to android/app/');
+    } catch (error) {
+        console.error('❌ Error copying google-services.json:', error);
+    }
+}
 
 async function copyXtremepushJS(projectRoot) {
     const sourcePath = path.join(__dirname, 'xtremepush.js');

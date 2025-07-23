@@ -231,29 +231,45 @@ const withXPExpoPlugin = (config, pluginConfig) => {
     config = withXcodeProject(config, (config) => {
         try {
             console.log('🔗 Attempting to link iOS files to Xcode project...');
-            const iosProjectPath = path.join(config.modRequest.projectRoot, 'ios');
-
+            const projectRoot = config.modRequest.projectRoot;
+            const iosProjectPath = path.join(projectRoot, 'ios');
+    
             // Add RNXtremepushReact.h if it exists
             const headerPath = path.join(iosProjectPath, 'RNXtremepushReact.h');
             if (fs.existsSync(headerPath)) {
-                const pbxFile = config.modResults.addSourceFile('RNXtremepushReact.h');
-                if (pbxFile) {
-                    config.modResults.addToPbxSourcesBuildPhase(pbxFile);
+                try {
+                    // Use relative path from iOS project directory
+                    const relativePath = 'RNXtremepushReact.h';
+                    const pbxFile = config.modResults.addSourceFile(relativePath, {}, iosProjectPath);
+                    console.log('✅ Linked RNXtremepushReact.h to Xcode project');
+                } catch (headerError) {
+                    console.warn('⚠️  Failed to add header file:', headerError.message);
                 }
-                console.log('✅ Linked RNXtremepushReact.h to Xcode project');
+            } else {
+                console.warn('⚠️  RNXtremepushReact.h not found at:', headerPath);
             }
-            
+    
             // Add RNXtremepushReact.m if it exists
             const implementationPath = path.join(iosProjectPath, 'RNXtremepushReact.m');
             if (fs.existsSync(implementationPath)) {
-                const pbxFile = config.modResults.addSourceFile('RNXtremepushReact.m');
-                if (pbxFile) {
-                    config.modResults.addToPbxSourcesBuildPhase(pbxFile);
+                try {
+                    // Use relative path from iOS project directory
+                    const relativePath = 'RNXtremepushReact.m';
+                    const pbxFile = config.modResults.addSourceFile(relativePath, {}, iosProjectPath);
+                    if (pbxFile) {
+                        // Ensure it's added to the build phase
+                        config.modResults.addToPbxSourcesBuildPhase(pbxFile);
+                    }
+                    console.log('✅ Linked RNXtremepushReact.m to Xcode project');
+                } catch (implError) {
+                    console.warn('⚠️  Failed to add implementation file:', implError.message);
                 }
-                console.log('✅ Linked RNXtremepushReact.m to Xcode project');
+            } else {
+                console.warn('⚠️  RNXtremepushReact.m not found at:', implementationPath);
             }
         } catch (error) {
-            console.warn('⚠️  Could not link files to Xcode project (this is normal for managed workflow):', error.message);
+            console.warn('⚠️  Could not link files to Xcode project:', error.message);
+            console.warn('This might be normal for managed workflow, but files should still be copied');
         }
         return config;
     });

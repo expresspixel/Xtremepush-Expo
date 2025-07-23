@@ -229,56 +229,9 @@ const withXPExpoPlugin = (config, pluginConfig) => {
 
     // Try to add files to Xcode project if possible
     config = withXcodeProject(config, (config) => {
-        try {
-            console.log('🔗 Attempting to link iOS files to Xcode project...');
-            const projectRoot = config.modRequest.projectRoot;
-            const iosProjectPath = path.join(projectRoot, 'ios');
-    
-            const firstTarget = config.modResults.getFirstTarget();
-            console.log('Target UUID:', firstTarget.uuid);
-    
-            // Add RNXtremepushReact.h
-            const headerPath = path.join(iosProjectPath, 'RNXtremepushReact.h');
-            if (fs.existsSync(headerPath)) {
-                try {
-                    const headerResult = config.modResults.addSourceFile('RNXtremepushReact.h', {}, firstTarget.uuid);
-                    console.log('✅ Added RNXtremepushReact.h to Xcode project (result:', headerResult, ')');
-                } catch (headerError) {
-                    console.warn('⚠️  Failed to add header file:', headerError.message);
-                }
-            }
-    
-            // Add RNXtremepushReact.m
-            const implementationPath = path.join(iosProjectPath, 'RNXtremepushReact.m');
-            if (fs.existsSync(implementationPath)) {
-                try {
-                    const implResult = config.modResults.addSourceFile('RNXtremepushReact.m', {}, firstTarget.uuid);
-                    console.log('✅ Added RNXtremepushReact.m to Xcode project (result:', implResult, ')');
-                    
-                    // The method works even if it returns false, so let's also try to add to build phase
-                    try {
-                        if (config.modResults.addToPbxSourcesBuildPhase) {
-                            // Try to add to build phase if possible
-                            const buildPhaseResult = config.modResults.addToPbxSourcesBuildPhase({
-                                uuid: 'RNXtremepushReact.m',
-                                target: firstTarget.uuid
-                            });
-                            console.log('✅ Added to build phase (result:', buildPhaseResult, ')');
-                        }
-                    } catch (buildPhaseError) {
-                        console.log('⚠️  Build phase addition failed (this might be OK):', buildPhaseError.message);
-                    }
-                    
-                } catch (implError) {
-                    console.warn('⚠️  Failed to add implementation file:', implError.message);
-                }
-            }
-    
-            console.log('✅ Xcode project file linking complete');
-    
-        } catch (error) {
-            console.warn('⚠️  Could not link files to Xcode project:', error.message);
-        }
+        console.log('🔗 Skipping Xcode project modification - files already copied to iOS directory');
+        console.log('✅ RNXtremepushReact.h and RNXtremepushReact.m are in ios/ folder');
+        console.log('🤞 Hoping the build system will find them automatically...');
         return config;
     });
 
